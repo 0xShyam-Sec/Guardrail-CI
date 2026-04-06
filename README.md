@@ -1,4 +1,4 @@
-# Operation Aegis — DevSecOps Security Pipeline
+# Guardrail CI — DevSecOps Security Pipeline
 
 > A fully automated, end-to-end DevSecOps security pipeline built on GitHub Actions, protecting a mock banking API across four layers of defense.
 
@@ -6,7 +6,7 @@
 
 **Skyline Financial Tech**, a rapidly scaling neobank, is moving to hourly deployments. After a leaked AWS key and a production SQL injection incident, the board has issued an ultimatum: **automate the defense in 30 days, or shut down deployment.**
 
-Operation Aegis is the answer — an invisible, intelligent security shield built entirely on GitHub.
+Guardrail CI is the answer — an invisible, intelligent security shield built entirely on GitHub.
 
 ## Architecture
 
@@ -96,8 +96,8 @@ skyline-banking-api/
 ## Running Locally
 
 ```bash
-git clone https://github.com/0x-Shyam-Sec/Operation-Aegis.git
-cd Operation-Aegis
+git clone https://github.com/0xShyam-Sec/Guardrail-CI.git
+cd Guardrail-CI
 
 # Install dependencies
 pip install -r requirements.txt

@@ -6,4 +6,4 @@ passlib==1.7.4
 bcrypt==4.1.2
 httpx==0.25.2
 pytest==8.3.4
-urllib3==1.26.5
+urllib3==2.6.3

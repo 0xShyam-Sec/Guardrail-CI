@@ -60,17 +60,17 @@ jobs:
           name: bandit-report
           path: bandit-report.json
 
-      - name: Fail on high severity
+      - name: Fail on medium severity or above
         run: |
-          HIGH_COUNT=$(python3 -c "
+          ISSUE_COUNT=$(python3 -c "
           import json
           data = json.load(open('bandit-report.json'))
-          high = sum(1 for r in data.get('results', []) if r.get('issue_severity') in ('HIGH', 'CRITICAL'))
-          print(high)
+          count = sum(1 for r in data.get('results', []) if r.get('issue_severity') in ('MEDIUM', 'HIGH', 'CRITICAL'))
+          print(count)
           ")
-          echo "High/Critical findings: $HIGH_COUNT"
-          if [ "$HIGH_COUNT" -gt 0 ]; then
-            echo "::error::Bandit found $HIGH_COUNT high/critical severity issues"
+          echo "Medium/High/Critical findings: $ISSUE_COUNT"
+          if [ "$ISSUE_COUNT" -gt 0 ]; then
+            echo "::error::Bandit found $ISSUE_COUNT medium+ severity issues"
             exit 1
           fi
 
@@ -168,7 +168,7 @@ jobs:
 
       - name: Build and start application
         run: |
-          docker-compose up -d --build
+          docker compose up -d --build
           echo "Waiting for application to be healthy..."
           for i in $(seq 1 30); do
             if curl -s http://localhost:8000/health | grep -q "healthy"; then
@@ -200,7 +200,7 @@ jobs:
 
       - name: Tear down application
         if: always()
-        run: docker-compose down
+        run: docker compose down
 
   # ============================================================
   # STAGE 3: Reporting (runs always)

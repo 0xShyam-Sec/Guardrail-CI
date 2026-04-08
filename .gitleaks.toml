@@ -1,0 +1,22 @@
+[extend]
+# Use the default gitleaks config as a base
+useDefault = true
+
+# Custom rule to catch Skyline-specific patterns
+[[rules]]
+id = "skyline-secret-key"
+description = "Skyline hardcoded secret key"
+regex = '''(?i)secret_key\s*=\s*["'][^"']+["']'''
+tags = ["key", "skyline"]
+
+[[rules]]
+id = "skyline-admin-password"
+description = "Skyline hardcoded admin password"
+regex = '''(?i)admin_password\s*=\s*["'][^"']+["']'''
+tags = ["password", "skyline"]
+
+[allowlist]
+description = "Global allowlist"
+paths = [
+    '''\.gitleaks\.toml''',
+]

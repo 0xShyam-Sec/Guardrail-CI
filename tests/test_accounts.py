@@ -1,4 +1,4 @@
-from jose import jwt
+import jwt
 from app.config import SECRET_KEY, ALGORITHM
 
 
@@ -28,8 +28,8 @@ def test_get_account_balance(client):
 
 
 def test_transfer_money(client):
-    headers1 = _get_auth_header(client, "user1", "pass1")
-    headers2 = _get_auth_header(client, "user2", "pass2")
+    headers1 = _get_auth_header(client, "user1", "password1")
+    headers2 = _get_auth_header(client, "user2", "password2")
 
     token1 = headers1["Authorization"].split(" ")[1]
     payload1 = jwt.decode(token1, SECRET_KEY, algorithms=[ALGORITHM])

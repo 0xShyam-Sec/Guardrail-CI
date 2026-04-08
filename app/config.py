@@ -1,7 +1,5 @@
-# WARNING: These are intentionally hardcoded for security scanning demonstration.
-# In production, use environment variables or a secrets manager.
+import os
 
-SECRET_KEY = "skyline-super-secret-123"
+SECRET_KEY = os.environ.get("SECRET_KEY", "change-me-in-production")
 ALGORITHM = "HS256"
-DATABASE_URL = "sqlite:///./skyline.db"
-ADMIN_PASSWORD = "admin123"
+DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./skyline.db")

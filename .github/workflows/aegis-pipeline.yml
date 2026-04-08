@@ -1,0 +1,263 @@
+name: "Aegis Security Pipeline"
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  # ============================================================
+  # STAGE 1: Code Security (parallel jobs)
+  # ============================================================
+
+  sast-codeql:
+    name: "SAST — CodeQL"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: python
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:python"
+
+  sast-bandit:
+    name: "SAST — Bandit"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Bandit
+        run: pip install bandit
+
+      - name: Run Bandit scan
+        run: |
+          bandit -r app/ -f json -o bandit-report.json --severity-level medium || true
+
+      - name: Upload Bandit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-report
+          path: bandit-report.json
+
+      - name: Fail on high severity
+        run: |
+          HIGH_COUNT=$(python3 -c "
+          import json
+          data = json.load(open('bandit-report.json'))
+          high = sum(1 for r in data.get('results', []) if r.get('issue_severity') in ('HIGH', 'CRITICAL'))
+          print(high)
+          ")
+          echo "High/Critical findings: $HIGH_COUNT"
+          if [ "$HIGH_COUNT" -gt 0 ]; then
+            echo "::error::Bandit found $HIGH_COUNT high/critical severity issues"
+            exit 1
+          fi
+
+  sca-trivy:
+    name: "SCA — Trivy"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy filesystem scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: "fs"
+          scan-ref: "."
+          format: "json"
+          output: "trivy-report.json"
+          severity: "HIGH,CRITICAL"
+
+      - name: Upload Trivy report
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-report
+          path: trivy-report.json
+
+      - name: Fail on high/critical CVEs
+        run: |
+          VULN_COUNT=$(python3 -c "
+          import json
+          data = json.load(open('trivy-report.json'))
+          count = sum(len(r.get('Vulnerabilities', [])) for r in data.get('Results', []))
+          print(count)
+          ")
+          echo "High/Critical vulnerabilities: $VULN_COUNT"
+          if [ "$VULN_COUNT" -gt 0 ]; then
+            echo "::error::Trivy found $VULN_COUNT high/critical vulnerabilities"
+            exit 1
+          fi
+
+  secrets-gitleaks:
+    name: "Secrets — Gitleaks"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
+        continue-on-error: true
+
+      - name: Run Gitleaks with JSON output
+        run: |
+          wget -q https://github.com/gitleaks/gitleaks/releases/download/v8.18.1/gitleaks_8.18.1_linux_x64.tar.gz
+          tar -xzf gitleaks_8.18.1_linux_x64.tar.gz
+          ./gitleaks detect --source . --config .gitleaks.toml --report-format json --report-path gitleaks-report.json || true
+
+      - name: Upload Gitleaks report
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitleaks-report
+          path: gitleaks-report.json
+
+      - name: Fail if secrets found
+        run: |
+          if [ -f gitleaks-report.json ]; then
+            COUNT=$(python3 -c "
+          import json
+          data = json.load(open('gitleaks-report.json'))
+          print(len(data) if isinstance(data, list) else 0)
+          ")
+            echo "Secrets found: $COUNT"
+            if [ "$COUNT" -gt 0 ]; then
+              echo "::error::Gitleaks found $COUNT secret(s) in the repository"
+              exit 1
+            fi
+          fi
+
+  # ============================================================
+  # STAGE 2: DAST (needs Stage 1)
+  # ============================================================
+
+  dast-zap:
+    name: "DAST — OWASP ZAP"
+    runs-on: ubuntu-latest
+    needs: [sast-codeql, sast-bandit, sca-trivy, secrets-gitleaks]
+    if: always()
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build and start application
+        run: |
+          docker-compose up -d --build
+          echo "Waiting for application to be healthy..."
+          for i in $(seq 1 30); do
+            if curl -s http://localhost:8000/health | grep -q "healthy"; then
+              echo "Application is ready!"
+              break
+            fi
+            echo "Attempt $i/30 — waiting..."
+            sleep 2
+          done
+
+      - name: Get OpenAPI spec
+        run: |
+          curl -s http://localhost:8000/openapi.json > openapi.json
+
+      - name: Run ZAP API scan
+        uses: zaproxy/action-api-scan@v0.7.0
+        with:
+          target: "http://localhost:8000/openapi.json"
+          format: openapi
+          cmd_options: "-J zap-report.json"
+          allow_issue_writing: false
+
+      - name: Upload ZAP report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-report
+          path: zap-report.json
+
+      - name: Tear down application
+        if: always()
+        run: docker-compose down
+
+  # ============================================================
+  # STAGE 3: Reporting (runs always)
+  # ============================================================
+
+  report-and-notify:
+    name: "Report & Notify"
+    runs-on: ubuntu-latest
+    needs: [sast-bandit, sca-trivy, secrets-gitleaks, dast-zap]
+    if: always()
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all scan artifacts
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Generate consolidated report
+        run: |
+          python scripts/generate_report.py \
+            --bandit bandit-report.json \
+            --trivy trivy-report.json \
+            --gitleaks gitleaks-report.json \
+            --zap zap-report.json \
+            --commit ${{ github.sha }} \
+            --output aegis-report.md
+
+      - name: Display report in logs
+        run: cat aegis-report.md
+
+      - name: Upload consolidated report
+        uses: actions/upload-artifact@v4
+        with:
+          name: aegis-security-report
+          path: aegis-report.md
+
+      - name: Send email notification
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          subject: "Aegis Security Report — ${{ github.repository }} [${{ github.sha }}]"
+          body: |
+            Aegis Security Pipeline completed for commit ${{ github.sha }}.
+
+            See the attached report and full results at:
+            https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          to: ${{ secrets.NOTIFY_EMAIL }}
+          from: "Aegis Pipeline <aegis@skyline.dev>"
+          attachments: aegis-report.md
+        continue-on-error: true

@@ -1,5 +1,11 @@
 # Guardrail CI — DevSecOps Security Pipeline
 
+![Aegis Security Pipeline](https://img.shields.io/github/actions/workflow/status/0xShyam-Sec/Guardrail-CI/aegis-pipeline.yml?branch=main&label=Aegis%20Security&logo=github)
+![Python](https://img.shields.io/badge/Python-3.11-blue?logo=python)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.104-green?logo=fastapi)
+![Docker](https://img.shields.io/badge/Docker-Enabled-blue?logo=docker)
+![License](https://img.shields.io/badge/License-MIT-yellow)
+
 > A fully automated, end-to-end DevSecOps security pipeline built on GitHub Actions, protecting a mock banking API across four layers of defense.
 
 ## The Scenario
@@ -59,19 +65,39 @@ A FastAPI mock banking API with **intentionally planted vulnerabilities** for th
 | `POST /accounts/{id}/transfer` | SQL injection via raw f-string queries |
 | `GET /admin/debug` | Exposes `os.environ` and system info |
 
-Additional: `requirements.txt` pins `urllib3==1.26.5` with known CVEs (CVE-2023-43804, CVE-2023-45803).
+Additional: `requirements.txt` pins `urllib3==1.26.5` and `python-jose==3.3.0` with known CVEs.
 
-## Pipeline Behavior
+## Pipeline Results
 
-- **`main` branch intentionally FAILS** — proving all scanners correctly detect the planted vulnerabilities
-- **`fix/secure-skyline` branch PASSES** — demonstrating remediation (parameterized queries, env-var secrets, patched deps)
+The `main` branch **intentionally FAILS** the security pipeline — proving the scanners work:
 
-This before/after flow validates the pipeline catches real issues and passes after proper fixes.
+| Scanner | Findings | Status |
+|---------|----------|--------|
+| Bandit (SAST) | 5 SQL injection vectors in `accounts.py` | FAIL |
+| Trivy (SCA) | 5 HIGH/CRITICAL CVEs (`urllib3`, `python-jose`) | FAIL |
+| Gitleaks (Secrets) | 21 secrets across git history | FAIL |
+| OWASP ZAP (DAST) | Vulnerabilities found in live API | FAIL |
+| CodeQL (SAST) | Analysis completed | PASS |
+
+The [`fix/secure-skyline`](../../pull/14) branch fixes all vulnerabilities and demonstrates a **green pipeline**.
+
+### What was fixed
+
+| Vulnerability | Fix Applied |
+|--------------|-------------|
+| Hardcoded secrets | Replaced with `os.environ.get()` |
+| SQL injection | Replaced raw queries with ORM parameterized queries |
+| IDOR | Added ownership checks (403 Access Denied) |
+| Info leak (`/admin/debug`) | Removed, replaced with safe `/admin/status` |
+| Vulnerable `python-jose` | Replaced with `pyjwt==2.8.0` |
+| Vulnerable `urllib3` | Updated to `2.1.0` |
+| No password validation | Added minimum 8 character requirement |
+| No token expiry | Added 1-hour JWT expiry |
 
 ## Project Structure
 
 ```
-skyline-banking-api/
+.
 ├── app/
 │   ├── main.py              # FastAPI entry point
 │   ├── config.py            # Hardcoded secrets (intentional)
@@ -80,13 +106,13 @@ skyline-banking-api/
 │   ├── auth.py              # Register/login routes
 │   ├── accounts.py          # Balance/transfer routes (SQLi)
 │   └── admin.py             # Debug endpoint (info leak)
-├── tests/                   # Endpoint tests
+├── tests/                   # Endpoint tests (8 tests)
 ├── scripts/
-│   └── generate_report.py   # Merges scan JSONs into Markdown
+│   └── generate_report.py   # Merges scan JSONs into Markdown report
 ├── .github/
 │   ├── workflows/
-│   │   └── aegis-pipeline.yml
-│   └── dependabot.yml
+│   │   └── aegis-pipeline.yml  # Full 4-layer security pipeline
+│   └── dependabot.yml          # Automated dependency monitoring
 ├── .gitleaks.toml           # Custom secret scanning rules
 ├── Dockerfile
 ├── docker-compose.yml
@@ -106,31 +132,46 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload
 
 # Or run with Docker
-docker-compose up --build
+docker compose up --build
 
 # API docs at http://localhost:8000/docs
 ```
 
-## Report Output
+## How the Pipeline Works
 
-The pipeline generates a consolidated Markdown report aggregating findings from all scanners:
+```
+Developer pushes code to GitHub
+       |
+       v
+GitHub Actions triggers automatically
+       |
+       v
+Stage 1 (parallel — ~60 seconds):
+  -> CodeQL: taint analysis for logic flaws
+  -> Bandit: Python-specific security lint
+  -> Trivy: CVE scan on dependencies
+  -> Gitleaks: secret detection in git history
+       |
+       v
+Stage 2 (sequential — ~2 minutes):
+  -> Docker builds and starts the app
+  -> OWASP ZAP attacks the live API via OpenAPI spec
+  -> Container torn down
+       |
+       v
+Stage 3 (always runs):
+  -> All scan results merged into one Markdown report
+  -> Report uploaded as GitHub artifact
+  -> Email notification sent (if configured)
+       |
+       v
+If ANY scanner finds HIGH/CRITICAL issues -> BUILD FAILS
+```
 
-| Scanner  | Findings | Critical | High | Medium | Low | Status |
-|----------|----------|----------|------|--------|-----|--------|
-| CodeQL   | -        | -        | -    | -      | -   | -      |
-| Bandit   | -        | -        | -    | -      | -   | -      |
-| Trivy    | -        | -        | -    | -      | -   | -      |
-| ZAP      | -        | -        | -    | -      | -   | -      |
-| Gitleaks | -        | -        | -    | -      | -   | -      |
-
-*Table populates with real data after pipeline execution.*
-
-## Current Status
-
-This repository currently contains the **design spec** and **implementation plan**. The full pipeline implementation is in progress.
+## Documentation
 
 - [Design Spec](docs/2026-04-06-operation-aegis-design.md) — Architecture and decisions
-- [Implementation Plan](docs/plans/2026-04-06-operation-aegis.md) — 12-task build plan with TDD
+- [Implementation Plan](docs/plans/2026-04-06-operation-aegis.md) — 12-task build plan
 
 ## License
 

@@ -233,7 +233,8 @@ jobs:
             --gitleaks gitleaks-report.json \
             --zap zap-report.json \
             --commit ${{ github.sha }} \
-            --output aegis-report.md
+            --output aegis-report.md \
+            --html-output aegis-report.html
 
       - name: Display report in logs
         run: cat aegis-report.md
@@ -242,7 +243,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: aegis-security-report
-          path: aegis-report.md
+          path: |
+            aegis-report.md
+            aegis-report.html
 
       - name: Send email notification
         uses: dawidd6/action-send-mail@v3

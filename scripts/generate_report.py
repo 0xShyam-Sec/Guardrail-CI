@@ -477,7 +477,6 @@ def generate_html(bandit, trivy, gitleaks, zap, now, commit_sha):
             font-weight: 900;
             color: #f8fafc;
             margin-bottom: 12px;
-            animation: glow 3s ease-in-out infinite;
             letter-spacing: -0.5px;
         }}
         .status-banner {{

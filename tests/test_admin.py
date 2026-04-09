@@ -1,6 +1,4 @@
-def test_debug_endpoint_exposes_env(client):
-    response = client.get("/admin/debug")
+def test_status_endpoint(client):
+    response = client.get("/admin/status")
     assert response.status_code == 200
-    data = response.json()
-    assert "environment" in data
-    assert "python_version" in data
+    assert response.json()["status"] == "operational"

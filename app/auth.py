@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
-from jose import jwt
+import jwt
 
 from app.config import SECRET_KEY, ALGORITHM
 from app.database import get_db
@@ -28,7 +28,8 @@ def register(request: RegisterRequest, db: Session = Depends(get_db)):
     if existing:
         raise HTTPException(status_code=400, detail="Username already exists")
 
-    # Intentional vuln: no password strength validation
+    if len(request.password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
     hashed = pwd_context.hash(request.password)
     user = User(username=request.username, hashed_password=hashed)
     db.add(user)
@@ -49,6 +50,10 @@ def login(request: LoginRequest, db: Session = Depends(get_db)):
     if not user or not pwd_context.verify(request.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    # Intentional vuln: no token expiry
-    token = jwt.encode({"sub": str(user.id)}, SECRET_KEY, algorithm=ALGORITHM)
+    from datetime import datetime, timedelta, timezone
+    token = jwt.encode(
+        {"sub": str(user.id), "exp": datetime.now(timezone.utc) + timedelta(hours=1)},
+        SECRET_KEY,
+        algorithm=ALGORITHM,
+    )
     return {"access_token": token, "token_type": "bearer"}

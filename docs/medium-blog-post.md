@@ -1,4 +1,4 @@
-# I Built a 4-Layer Automated Security Pipeline That Catches Vulnerabilities Before They Ship
+# I Planted 6 Vulnerabilities in a Banking API — Then Built a Pipeline That Caught All of Them
 
 ## How I used GitHub Actions, CodeQL, OWASP ZAP, and 3 other scanners to build a DevSecOps pipeline that blocks insecure code automatically
 
@@ -39,6 +39,8 @@ Manual security reviews can't keep up with 50 deployments a day. By the time a h
 
 I designed the pipeline with four distinct security layers, each catching a different category of vulnerability:
 
+> **SCREENSHOT: Insert the Mermaid flowchart diagram image here (create at mermaid.live)**
+
 ### Layer 1: Static Analysis (SAST) — Reading the Code
 
 **Tools: CodeQL + Bandit**
@@ -50,6 +52,8 @@ Static analysis reads your source code without running it — like a proofreader
 **Bandit** is Python-specific. It catches patterns that CodeQL might miss: hardcoded passwords, use of unsafe functions like `os.system()`, and weak cryptographic practices.
 
 In my test application, Bandit found **5 SQL injection vectors** in a single file — every place where I used raw f-string queries instead of parameterized ORM queries.
+
+> **SCREENSHOT: Bandit job logs showing "Medium/High/Critical findings: 5" and the error message**
 
 ### Layer 2: Dependency Scanning (SCA) — Checking the Supply Chain
 
@@ -65,7 +69,11 @@ In my project, Trivy flagged **5 high/critical vulnerabilities**:
 
 These aren't theoretical risks. These CVEs have public exploit details. Anyone can look them up and attack your application.
 
+> **SCREENSHOT: Trivy job logs showing "High/Critical vulnerabilities: 5"**
+
 **Dependabot** runs natively on GitHub and automatically creates pull requests to update vulnerable dependencies. Within minutes of pushing my code, Dependabot had already opened a PR to upgrade `urllib3`.
+
+> **SCREENSHOT: Dependabot PR on GitHub showing "Bump urllib3 from 1.26.5 to 2.6.3" with CVE details**
 
 ### Layer 3: Dynamic Analysis (DAST) — Attacking the Live App
 
@@ -84,6 +92,8 @@ Here's how it works in the pipeline:
 
 This is the same approach professional penetration testers use — except it runs automatically on every commit.
 
+> **SCREENSHOT: ZAP job logs showing "Application is ready!" followed by the scan running**
+
 ### Layer 4: Secrets Scanning — Guarding the Keys
 
 **Tool: Gitleaks**
@@ -93,6 +103,8 @@ The most dangerous vulnerability isn't a code bug — it's a leaked credential. 
 Gitleaks scans the **entire git history**, not just the current code. This is critical because even if you delete a secret in a later commit, the old commit still has it. Anyone can run `git log` and find it. The current code looks clean, but the history tells the truth. Gitleaks catches this.
 
 In my repository, Gitleaks found **21 secrets** across all commits — including hardcoded keys in configuration files and even passwords mentioned in documentation.
+
+> **SCREENSHOT: Gitleaks job logs showing "Secrets found: 21" and the error**
 
 ---
 
@@ -136,6 +148,8 @@ When pushed to GitHub, every scanner correctly identified the vulnerabilities:
 
 The build was **blocked**. The code cannot merge. This is exactly what should happen.
 
+> **SCREENSHOT: GitHub Actions pipeline overview showing all jobs — red X on Bandit, Trivy, Gitleaks, ZAP and green checkmark on CodeQL and Report**
+
 ### The Fix: Pipeline PASSES
 
 I then created a `fix/secure-skyline` branch that addresses every vulnerability:
@@ -148,6 +162,8 @@ I then created a `fix/secure-skyline` branch that addresses every vulnerability:
 - **No Token Expiry** — added 1-hour JWT expiration
 
 The pipeline runs again on the fix branch — and **passes green**. This before/after flow is the proof that the system works.
+
+> **SCREENSHOT: The diff from the fix PR — red lines (SQL injection) replaced by green lines (ORM query). Use the same screenshot you showed me earlier.**
 
 ---
 
@@ -164,6 +180,10 @@ Every pipeline run generates a styled HTML dashboard that shows:
   - What could happen (real-world risk)
   - Example attack payload (how an attacker would exploit it)
   - How to fix it (specific remediation steps)
+
+> **SCREENSHOT: Full HTML report dashboard — the header with "GUARDRAIL CI", the PIPELINE FAIL banner, stat cards, and scanner result cards**
+
+> **SCREENSHOT: One detailed finding card from the HTML report — showing "Why was this blocked?", "What could happen?", "Example Attack Payload", and "How to fix"**
 
 The report is uploaded as a GitHub artifact — downloadable by anyone on the team. An email notification is also sent with a link to the results.
 
@@ -215,6 +235,8 @@ The entire project is open source:
 - Styled HTML report generator in `scripts/generate_report.py`
 
 Fork it, push to your own repo, and watch the pipeline run. The tools are all free for public repositories.
+
+> **SCREENSHOT: Your GitHub repo main page — README with badges and the Mermaid architecture diagram**
 
 ---
 

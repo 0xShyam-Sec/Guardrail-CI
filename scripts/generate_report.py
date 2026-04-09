@@ -194,6 +194,83 @@ def _stat_card(label, value, color):
     </div>"""
 
 
+def _cwe_info(cwe_id):
+    """Return explanation, risk, and example payload for a CWE."""
+    cwe_db = {
+        "89": {
+            "name": "SQL Injection",
+            "why_blocked": "User input is inserted directly into a SQL query without sanitization. An attacker can manipulate the query to read, modify, or delete any data in the database.",
+            "risk": "An attacker can steal all customer data, modify account balances, or delete entire database tables.",
+            "payload": "GET /accounts/1 OR 1=1--\nGET /accounts/0 UNION SELECT id,username,hashed_password FROM users--\nGET /accounts/1; DROP TABLE accounts;--",
+            "fix": "Use parameterized queries (ORM) instead of string concatenation. Replace text(f\"SELECT ... {user_input}\") with db.query(Model).filter(Model.id == user_input).",
+        },
+        "259": {
+            "name": "Hardcoded Password",
+            "why_blocked": "A password or secret key is written directly in the source code. Anyone who can read the code (e.g., on a public GitHub repo) has access to the credential.",
+            "risk": "Attacker reads the source code, finds the secret, and can forge authentication tokens or access protected resources.",
+            "payload": "# Attacker reads config.py and finds:\nSECRET_KEY = \"skyline-super-secret-123\"\n# Then forges a JWT token:\nimport jwt\nfake = jwt.encode({\"sub\": \"1\"}, \"skyline-super-secret-123\")",
+            "fix": "Store secrets in environment variables or a secrets manager. Use os.environ.get(\"SECRET_KEY\") instead of hardcoding.",
+        },
+        "200": {
+            "name": "Information Disclosure",
+            "why_blocked": "The application exposes internal details (environment variables, stack traces, system info) to external users.",
+            "risk": "Attacker learns database URLs, API keys, internal IPs, and software versions — all useful for planning further attacks.",
+            "payload": "GET /admin/debug\n# Response includes:\n# DATABASE_URL, AWS_SECRET_KEY, internal IPs, Python version",
+            "fix": "Remove debug endpoints in production. Never expose os.environ or stack traces to end users.",
+        },
+    }
+    return cwe_db.get(str(cwe_id), {
+        "name": f"CWE-{cwe_id}",
+        "why_blocked": "A security anti-pattern was detected in the source code by static analysis.",
+        "risk": "This code pattern is known to introduce security vulnerabilities.",
+        "payload": "N/A — see CWE database for details.",
+        "fix": "Refer to https://cwe.mitre.org/data/definitions/" + str(cwe_id) + ".html",
+    })
+
+
+def _finding_card(severity, title, location, why_blocked, risk, payload, fix):
+    """Return a detailed HTML finding card."""
+    sev_colors = {"CRITICAL": "#dc2626", "HIGH": "#ea580c", "MEDIUM": "#ca8a04", "LOW": "#2563eb"}
+    border = sev_colors.get(severity, "#6b7280")
+
+    payload_html = ""
+    if payload and payload != "N/A":
+        escaped = payload.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        payload_html = f"""
+            <div style="margin-top:12px">
+                <div style="color:#f87171;font-weight:600;font-size:13px;margin-bottom:6px">Example Attack Payload</div>
+                <pre style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:12px;color:#fbbf24;font-size:13px;overflow-x:auto;white-space:pre-wrap">{escaped}</pre>
+            </div>"""
+
+    return f"""
+    <div style="background:#1e293b;border-left:4px solid {border};border-radius:8px;padding:20px;margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+            <div style="display:flex;align-items:center;gap:10px">
+                {_severity_badge(severity)}
+                <span style="font-size:16px;font-weight:700;color:#f1f5f9">{title}</span>
+            </div>
+            <code style="font-size:12px;color:#94a3b8">{location}</code>
+        </div>
+
+        <div style="margin-bottom:12px">
+            <div style="color:#f97316;font-weight:600;font-size:13px;margin-bottom:4px">Why was this blocked?</div>
+            <div style="color:#cbd5e1;font-size:14px">{why_blocked}</div>
+        </div>
+
+        <div style="margin-bottom:12px">
+            <div style="color:#ef4444;font-weight:600;font-size:13px;margin-bottom:4px">What could happen?</div>
+            <div style="color:#cbd5e1;font-size:14px">{risk}</div>
+        </div>
+
+        {payload_html}
+
+        <div style="margin-top:12px">
+            <div style="color:#22c55e;font-weight:600;font-size:13px;margin-bottom:4px">How to fix</div>
+            <div style="color:#cbd5e1;font-size:14px">{fix}</div>
+        </div>
+    </div>"""
+
+
 def generate_html(bandit, trivy, gitleaks, zap, now, commit_sha):
     """Generate styled HTML report."""
     all_results = [bandit, trivy, gitleaks, zap]
@@ -218,98 +295,96 @@ def generate_html(bandit, trivy, gitleaks, zap, now, commit_sha):
 
     # Bandit details
     if bandit.get("details"):
-        rows = ""
+        cards = ""
         for d in bandit["details"]:
-            rows += f"""<tr>
-                <td>{_severity_badge(d['severity'])}</td>
-                <td><code>{d['file']}:{d['line']}</code></td>
-                <td>{d['issue']}</td>
-                <td>CWE-{d['cwe']}</td>
-            </tr>"""
+            info = _cwe_info(d["cwe"])
+            cards += _finding_card(
+                severity=d["severity"],
+                title=info["name"],
+                location=f"{d['file']}:{d['line']}",
+                why_blocked=info["why_blocked"],
+                risk=info["risk"],
+                payload=info["payload"],
+                fix=info["fix"],
+            )
         detail_sections += f"""
-        <div style="margin-bottom:32px">
-            <h3 style="color:#e2e8f0;margin-bottom:12px">Bandit — SAST Findings</h3>
-            <table style="width:100%;border-collapse:collapse">
-                <thead><tr style="border-bottom:2px solid #334155">
-                    <th style="text-align:left;padding:10px;color:#94a3b8">Severity</th>
-                    <th style="text-align:left;padding:10px;color:#94a3b8">Location</th>
-                    <th style="text-align:left;padding:10px;color:#94a3b8">Issue</th>
-                    <th style="text-align:left;padding:10px;color:#94a3b8">CWE</th>
-                </tr></thead>
-                <tbody>{rows}</tbody>
-            </table>
+        <div style="margin-bottom:40px">
+            <h3 style="color:#e2e8f0;margin-bottom:4px">Bandit — SAST Findings</h3>
+            <p style="color:#64748b;font-size:13px;margin-bottom:16px">Static analysis scanned source code without running it and found these security issues.</p>
+            {cards}
         </div>"""
 
     # Trivy details
     if trivy.get("details"):
-        rows = ""
+        cards = ""
         for d in trivy["details"]:
-            rows += f"""<tr>
-                <td>{_severity_badge(d['severity'])}</td>
-                <td><code>{d['package']}=={d['version']}</code></td>
-                <td>{d['vuln_id']}</td>
-                <td>{d['title']}</td>
-            </tr>"""
+            cards += _finding_card(
+                severity=d["severity"],
+                title=f"{d['vuln_id']}",
+                location=f"{d['package']}=={d['version']}",
+                why_blocked=f"The library <strong>{d['package']}</strong> version <strong>{d['version']}</strong> has a publicly known vulnerability ({d['vuln_id']}). Attackers can look up exactly how to exploit it.",
+                risk=d["title"] if d["title"] else "This version contains a security flaw that has been fixed in a newer release.",
+                payload=f"# This CVE is public. Attackers can find exploit details at:\n# https://nvd.nist.gov/vuln/detail/{d['vuln_id']}\n# https://security.snyk.io/vuln/{d['vuln_id']}",
+                fix=f"Update {d['package']} to the latest patched version. Run: pip install --upgrade {d['package']}",
+            )
         detail_sections += f"""
-        <div style="margin-bottom:32px">
-            <h3 style="color:#e2e8f0;margin-bottom:12px">Trivy — Dependency Vulnerabilities</h3>
-            <table style="width:100%;border-collapse:collapse">
-                <thead><tr style="border-bottom:2px solid #334155">
-                    <th style="text-align:left;padding:10px;color:#94a3b8">Severity</th>
-                    <th style="text-align:left;padding:10px;color:#94a3b8">Package</th>
-                    <th style="text-align:left;padding:10px;color:#94a3b8">CVE</th>
-                    <th style="text-align:left;padding:10px;color:#94a3b8">Description</th>
-                </tr></thead>
-                <tbody>{rows}</tbody>
-            </table>
+        <div style="margin-bottom:40px">
+            <h3 style="color:#e2e8f0;margin-bottom:4px">Trivy — Dependency Vulnerabilities</h3>
+            <p style="color:#64748b;font-size:13px;margin-bottom:16px">Your project uses third-party libraries with known security flaws registered in the CVE database.</p>
+            {cards}
         </div>"""
 
     # Gitleaks details
     if gitleaks.get("details"):
-        rows = ""
+        # Deduplicate by file+rule
+        seen = set()
+        unique_details = []
         for d in gitleaks["details"]:
-            rows += f"""<tr>
-                <td>{_severity_badge('CRITICAL')}</td>
-                <td><code>{d['file']}</code></td>
-                <td>{d['rule']}</td>
-                <td><code>{d['match']}</code></td>
-            </tr>"""
+            key = f"{d['file']}:{d['rule']}"
+            if key not in seen:
+                seen.add(key)
+                unique_details.append(d)
+
+        cards = ""
+        for d in unique_details:
+            escaped_match = d["match"].replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            cards += _finding_card(
+                severity="CRITICAL",
+                title=f"Secret Detected — {d['rule']}",
+                location=d["file"],
+                why_blocked=f"A credential or secret was found committed in the source code. The pattern <code>{escaped_match}</code> matches a known secret format. Even if deleted later, it remains in git history forever.",
+                risk="Anyone with repo access (or public access) can extract this secret and use it to: forge auth tokens, access databases, impersonate users, or escalate privileges.",
+                payload=f"# Attacker runs:\ngit log -p -- {d['file']}\n# Finds the secret in commit history\n# Uses it to authenticate as any user",
+                fix="1. Rotate the secret immediately (generate a new one).\n2. Store secrets in environment variables or GitHub Encrypted Secrets.\n3. Use git filter-branch or BFG Repo Cleaner to remove from history.",
+            )
+
+        total_secrets = len(gitleaks["details"])
+        unique_count = len(unique_details)
         detail_sections += f"""
-        <div style="margin-bottom:32px">
-            <h3 style="color:#e2e8f0;margin-bottom:12px">Gitleaks — Exposed Secrets</h3>
-            <table style="width:100%;border-collapse:collapse">
-                <thead><tr style="border-bottom:2px solid #334155">
-                    <th style="text-align:left;padding:10px;color:#94a3b8">Severity</th>
-                    <th style="text-align:left;padding:10px;color:#94a3b8">File</th>
-                    <th style="text-align:left;padding:10px;color:#94a3b8">Rule</th>
-                    <th style="text-align:left;padding:10px;color:#94a3b8">Match</th>
-                </tr></thead>
-                <tbody>{rows}</tbody>
-            </table>
+        <div style="margin-bottom:40px">
+            <h3 style="color:#e2e8f0;margin-bottom:4px">Gitleaks — Exposed Secrets</h3>
+            <p style="color:#64748b;font-size:13px;margin-bottom:16px">{total_secrets} secret(s) found across all commits ({unique_count} unique). Gitleaks scans the entire git history — secrets "deleted" in later commits are still visible.</p>
+            {cards}
         </div>"""
 
     # ZAP details
     if zap.get("details"):
-        rows = ""
+        cards = ""
         for d in zap["details"]:
-            rows += f"""<tr>
-                <td>{_severity_badge(d['risk'])}</td>
-                <td>{d['alert']}</td>
-                <td>{d['description']}</td>
-                <td><code>{d['url']}</code></td>
-            </tr>"""
+            cards += _finding_card(
+                severity=d["risk"],
+                title=d["alert"],
+                location=d["url"],
+                why_blocked=f"OWASP ZAP attacked the live API and discovered: {d['description']}",
+                risk="This vulnerability was found by actually exploiting the running application. A real attacker could reproduce this attack.",
+                payload=f"# ZAP sent malicious payloads to:\n# {d['url']}\n# The application did not properly reject the attack.",
+                fix="Validate and sanitize all user input. Use parameterized queries for databases. Set security headers. Follow OWASP Top 10 guidelines.",
+            )
         detail_sections += f"""
-        <div style="margin-bottom:32px">
-            <h3 style="color:#e2e8f0;margin-bottom:12px">ZAP — Runtime Vulnerabilities</h3>
-            <table style="width:100%;border-collapse:collapse">
-                <thead><tr style="border-bottom:2px solid #334155">
-                    <th style="text-align:left;padding:10px;color:#94a3b8">Risk</th>
-                    <th style="text-align:left;padding:10px;color:#94a3b8">Alert</th>
-                    <th style="text-align:left;padding:10px;color:#94a3b8">Description</th>
-                    <th style="text-align:left;padding:10px;color:#94a3b8">URL</th>
-                </tr></thead>
-                <tbody>{rows}</tbody>
-            </table>
+        <div style="margin-bottom:40px">
+            <h3 style="color:#e2e8f0;margin-bottom:4px">ZAP — Runtime Vulnerabilities</h3>
+            <p style="color:#64748b;font-size:13px;margin-bottom:16px">OWASP ZAP attacked the running application with real exploit payloads and found these exploitable vulnerabilities.</p>
+            {cards}
         </div>"""
 
     # Scanner summary cards

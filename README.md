@@ -10,8 +10,9 @@
 
 ## The Scenario
 
-Imagine a fintech startup deploying code 50 times a day. One night, a developer accidentally pushes an AWS secret key to a public repo. A week later, a SQL injection flaw is found in the production API. The board says: automate security, or shut down deployment.                                                                                                                    
-Guardrail CI is the answer — an automated security pipeline that scans every commit across four layers of defense and blocks anything that fails.
+Imagine a **fintech** **startup** deploying code 50 times a day. One night, a developer accidentally pushes an AWS secret key to a public repo. A week later, a SQL injection flaw is found in the production API. The board says: automate security, or shut down deployment.                                                                                                       
+
+**Guardrail** CI is the answer — an automated security pipeline that scans every commit across four layers of defense and blocks anything that fails.
 
 ## Architecture
 

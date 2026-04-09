@@ -544,8 +544,9 @@ def generate_html(bandit, trivy, gitleaks, zap, now, commit_sha):
         <div class="header" style="text-align:center;margin-bottom:56px">
             <div class="project-name">Guardrail CI</div>
             <h1 class="report-title">Aegis Security Report</h1>
-            <div class="meta-info">
-                {now} &nbsp;&bull;&nbsp; Commit <code style="font-size:15px">{commit_sha[:8]}</code>
+            <div style="font-size:22px;color:#e2e8f0;font-weight:600;margin-bottom:8px;animation:fadeIn 1s ease-out 0.2s both">{now}</div>
+            <div class="meta-info" style="font-size:14px">
+                Commit <code style="font-size:14px">{commit_sha[:8]}</code>
             </div>
         </div>
 

@@ -243,7 +243,7 @@ def _finding_card(severity, title, location, why_blocked, risk, payload, fix):
             </div>"""
 
     return f"""
-    <div style="background:#1e293b;border-left:4px solid {border};border-radius:8px;padding:20px;margin-bottom:16px">
+    <div class="finding-card" style="background:#1e293b;border-left:4px solid {border};border-radius:8px;padding:24px;margin-bottom:16px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
             <div style="display:flex;align-items:center;gap:10px">
                 {_severity_badge(severity)}
@@ -394,21 +394,21 @@ def generate_html(bandit, trivy, gitleaks, zap, now, commit_sha):
         icon = "&#10060;" if s == "FAIL" else "&#9989;"
         border_color = "#dc2626" if s == "FAIL" else "#16a34a"
         scanner_cards += f"""
-        <div style="background:#1e293b;border-radius:12px;padding:20px;border-left:4px solid {border_color}">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div class="scanner-card" style="background:#1e293b;border-radius:12px;padding:24px;border-left:4px solid {border_color}">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
                 <div>
-                    <span style="font-size:18px;font-weight:700;color:#f1f5f9">{icon} {name}</span>
-                    <span style="color:#64748b;font-size:13px;margin-left:8px">{subtitle}</span>
+                    <span style="font-size:20px;font-weight:700;color:#f1f5f9">{icon} {name}</span>
+                    <span style="color:#64748b;font-size:14px;margin-left:10px">{subtitle}</span>
                 </div>
                 {_status_badge(s)}
             </div>
-            <div style="color:#94a3b8;font-size:13px;margin-bottom:12px">{desc}</div>
-            <div style="display:flex;gap:16px;flex-wrap:wrap">
-                <span style="color:#94a3b8">Findings: <strong style="color:#f1f5f9">{result['findings']}</strong></span>
-                <span style="color:#dc2626">Critical: <strong>{result['critical']}</strong></span>
-                <span style="color:#ea580c">High: <strong>{result['high']}</strong></span>
-                <span style="color:#ca8a04">Medium: <strong>{result['medium']}</strong></span>
-                <span style="color:#2563eb">Low: <strong>{result['low']}</strong></span>
+            <div style="color:#94a3b8;font-size:14px;margin-bottom:14px">{desc}</div>
+            <div style="display:flex;gap:20px;flex-wrap:wrap;font-size:14px">
+                <span style="color:#94a3b8">Findings: <strong style="color:#f1f5f9;font-size:16px">{result['findings']}</strong></span>
+                <span style="color:#dc2626">Critical: <strong style="font-size:16px">{result['critical']}</strong></span>
+                <span style="color:#ea580c">High: <strong style="font-size:16px">{result['high']}</strong></span>
+                <span style="color:#ca8a04">Medium: <strong style="font-size:16px">{result['medium']}</strong></span>
+                <span style="color:#2563eb">Low: <strong style="font-size:16px">{result['low']}</strong></span>
             </div>
         </div>"""
 
@@ -426,45 +426,173 @@ def generate_html(bandit, trivy, gitleaks, zap, now, commit_sha):
         td, th {{ padding: 10px; text-align: left; }}
         tbody tr {{ border-bottom: 1px solid #1e293b; }}
         tbody tr:hover {{ background: #1e293b; }}
-        .container {{ max-width: 1100px; margin: 0 auto; padding: 40px 24px; }}
+        .container {{ max-width: 1200px; margin: 0 auto; padding: 48px 32px; }}
+
+        /* Animations */
+        @keyframes fadeInUp {{
+            from {{ opacity: 0; transform: translateY(30px); }}
+            to {{ opacity: 1; transform: translateY(0); }}
+        }}
+        @keyframes fadeIn {{
+            from {{ opacity: 0; }}
+            to {{ opacity: 1; }}
+        }}
+        @keyframes slideInLeft {{
+            from {{ opacity: 0; transform: translateX(-40px); }}
+            to {{ opacity: 1; transform: translateX(0); }}
+        }}
+        @keyframes glow {{
+            0%, 100% {{ text-shadow: 0 0 10px rgba(56,189,248,0.3), 0 0 20px rgba(56,189,248,0.1); }}
+            50% {{ text-shadow: 0 0 20px rgba(56,189,248,0.6), 0 0 40px rgba(56,189,248,0.3), 0 0 60px rgba(56,189,248,0.1); }}
+        }}
+        @keyframes pulseStatus {{
+            0%, 100% {{ transform: scale(1); }}
+            50% {{ transform: scale(1.03); }}
+        }}
+        @keyframes shimmer {{
+            0% {{ background-position: -200% center; }}
+            100% {{ background-position: 200% center; }}
+        }}
+        @keyframes countUp {{
+            from {{ opacity: 0; transform: scale(0.5); }}
+            to {{ opacity: 1; transform: scale(1); }}
+        }}
+
+        .header {{ animation: fadeInUp 0.8s ease-out; }}
+        .project-name {{
+            font-size: 18px;
+            font-weight: 700;
+            letter-spacing: 6px;
+            text-transform: uppercase;
+            margin-bottom: 12px;
+            background: linear-gradient(90deg, #38bdf8, #818cf8, #c084fc, #38bdf8);
+            background-size: 200% auto;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: shimmer 3s linear infinite;
+        }}
+        .report-title {{
+            font-size: 44px;
+            font-weight: 900;
+            color: #f8fafc;
+            margin-bottom: 12px;
+            animation: glow 3s ease-in-out infinite;
+            letter-spacing: -0.5px;
+        }}
+        .status-banner {{
+            animation: fadeInUp 1s ease-out 0.3s both;
+        }}
+        .status-badge {{
+            display: inline-block;
+            padding: 16px 48px;
+            border-radius: 12px;
+            font-size: 26px;
+            font-weight: 900;
+            letter-spacing: 3px;
+            animation: pulseStatus 2s ease-in-out infinite;
+        }}
+        .stat-cards {{
+            animation: fadeInUp 1s ease-out 0.5s both;
+        }}
+        .stat-card {{
+            animation: countUp 0.6s ease-out both;
+        }}
+        .stat-card:nth-child(1) {{ animation-delay: 0.6s; }}
+        .stat-card:nth-child(2) {{ animation-delay: 0.75s; }}
+        .stat-card:nth-child(3) {{ animation-delay: 0.9s; }}
+        .stat-card:nth-child(4) {{ animation-delay: 1.05s; }}
+        .stat-card:nth-child(5) {{ animation-delay: 1.2s; }}
+        .scanner-card {{
+            animation: slideInLeft 0.6s ease-out both;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }}
+        .scanner-card:hover {{
+            transform: translateX(6px);
+            box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+        }}
+        .scanner-card:nth-child(1) {{ animation-delay: 0.8s; }}
+        .scanner-card:nth-child(2) {{ animation-delay: 0.95s; }}
+        .scanner-card:nth-child(3) {{ animation-delay: 1.1s; }}
+        .scanner-card:nth-child(4) {{ animation-delay: 1.25s; }}
+        .finding-card {{
+            animation: fadeIn 0.5s ease-out both;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }}
+        .finding-card:hover {{
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+        }}
+        .section-title {{
+            animation: fadeInUp 0.6s ease-out both;
+        }}
+        .meta-info {{
+            font-size: 16px;
+            color: #94a3b8;
+            animation: fadeIn 1.2s ease-out 0.2s both;
+        }}
+        .divider {{
+            height: 1px;
+            background: linear-gradient(90deg, transparent, #334155, transparent);
+            margin: 48px 0;
+        }}
     </style>
 </head>
 <body>
     <div class="container">
 
         <!-- Header -->
-        <div style="text-align:center;margin-bottom:48px">
-            <div style="font-size:14px;color:#64748b;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px">Guardrail CI</div>
-            <h1 style="font-size:32px;font-weight:800;color:#f8fafc;margin-bottom:8px">Aegis Security Report</h1>
-            <div style="color:#94a3b8;font-size:14px">
-                {now} &nbsp;&bull;&nbsp; Commit <code>{commit_sha[:8]}</code>
+        <div class="header" style="text-align:center;margin-bottom:56px">
+            <div class="project-name">Guardrail CI</div>
+            <h1 class="report-title">Aegis Security Report</h1>
+            <div class="meta-info">
+                {now} &nbsp;&bull;&nbsp; Commit <code style="font-size:15px">{commit_sha[:8]}</code>
             </div>
         </div>
 
         <!-- Overall Status -->
-        <div style="text-align:center;margin-bottom:40px">
-            <div style="display:inline-block;background:{overall_color};color:#fff;padding:12px 32px;border-radius:8px;font-size:20px;font-weight:800;letter-spacing:1px">
+        <div class="status-banner" style="text-align:center;margin-bottom:48px">
+            <div class="status-badge" style="background:{overall_color};color:#fff;box-shadow:0 0 30px {overall_color}44">
                 PIPELINE {overall}
             </div>
         </div>
 
         <!-- Stat Cards -->
-        <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:48px">
-            {_stat_card("Total Findings", total_findings, "#475569")}
-            {_stat_card("Critical", total_critical, "#dc2626")}
-            {_stat_card("High", total_high, "#ea580c")}
-            {_stat_card("Medium", total_medium, "#ca8a04")}
-            {_stat_card("Low", total_low, "#2563eb")}
+        <div class="stat-cards" style="display:flex;gap:20px;justify-content:center;flex-wrap:wrap;margin-bottom:56px">
+            <div class="stat-card" style="background:#475569;border-radius:16px;padding:24px 32px;min-width:140px;text-align:center">
+                <div style="font-size:40px;font-weight:900;color:#fff">{total_findings}</div>
+                <div style="font-size:14px;color:rgba(255,255,255,0.85);margin-top:4px">Total Findings</div>
+            </div>
+            <div class="stat-card" style="background:#dc2626;border-radius:16px;padding:24px 32px;min-width:140px;text-align:center">
+                <div style="font-size:40px;font-weight:900;color:#fff">{total_critical}</div>
+                <div style="font-size:14px;color:rgba(255,255,255,0.85);margin-top:4px">Critical</div>
+            </div>
+            <div class="stat-card" style="background:#ea580c;border-radius:16px;padding:24px 32px;min-width:140px;text-align:center">
+                <div style="font-size:40px;font-weight:900;color:#fff">{total_high}</div>
+                <div style="font-size:14px;color:rgba(255,255,255,0.85);margin-top:4px">High</div>
+            </div>
+            <div class="stat-card" style="background:#ca8a04;border-radius:16px;padding:24px 32px;min-width:140px;text-align:center">
+                <div style="font-size:40px;font-weight:900;color:#fff">{total_medium}</div>
+                <div style="font-size:14px;color:rgba(255,255,255,0.85);margin-top:4px">Medium</div>
+            </div>
+            <div class="stat-card" style="background:#2563eb;border-radius:16px;padding:24px 32px;min-width:140px;text-align:center">
+                <div style="font-size:40px;font-weight:900;color:#fff">{total_low}</div>
+                <div style="font-size:14px;color:rgba(255,255,255,0.85);margin-top:4px">Low</div>
+            </div>
         </div>
 
+        <div class="divider"></div>
+
         <!-- Scanner Cards -->
-        <h2 style="font-size:22px;font-weight:700;color:#f1f5f9;margin-bottom:20px">Scanner Results</h2>
-        <div style="display:flex;flex-direction:column;gap:16px;margin-bottom:48px">
+        <h2 class="section-title" style="font-size:28px;font-weight:800;color:#f1f5f9;margin-bottom:24px">Scanner Results</h2>
+        <div style="display:flex;flex-direction:column;gap:16px;margin-bottom:24px">
             {scanner_cards}
         </div>
 
+        <div class="divider"></div>
+
         <!-- Detail Tables -->
-        <h2 style="font-size:22px;font-weight:700;color:#f1f5f9;margin-bottom:20px">Detailed Findings</h2>
+        <h2 class="section-title" style="font-size:28px;font-weight:800;color:#f1f5f9;margin-bottom:24px">Detailed Findings</h2>
         {detail_sections if detail_sections else '<p style="color:#64748b">No detailed findings to display.</p>'}
 
         <!-- Footer -->

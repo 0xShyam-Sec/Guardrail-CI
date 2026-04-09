@@ -90,15 +90,7 @@ This is the same approach professional penetration testers use — except it run
 
 The most dangerous vulnerability isn't a code bug — it's a leaked credential. A single exposed API key can give an attacker full access to your cloud infrastructure, database, and customer data.
 
-Gitleaks scans the **entire git history**, not just the current code. This is critical because:
-
-```
-Commit 1: Added SECRET_KEY = "skyline-super-secret-123"  ← Gitleaks finds this
-Commit 2: Removed the secret from the file
-Commit 3: Current code looks clean
-
-But commit 1 still exists in git history. Anyone can find it.
-```
+Gitleaks scans the **entire git history**, not just the current code. This is critical because even if you delete a secret in a later commit, the old commit still has it. Anyone can run `git log` and find it. The current code looks clean, but the history tells the truth. Gitleaks catches this.
 
 In my repository, Gitleaks found **21 secrets** across all commits — including hardcoded keys in configuration files and even passwords mentioned in documentation.
 
@@ -106,29 +98,19 @@ In my repository, Gitleaks found **21 secrets** across all commits — including
 
 ## The Architecture
 
-The entire pipeline runs in a single GitHub Actions workflow file. Here's how the stages flow:
+The entire pipeline runs in a single GitHub Actions workflow file, organized into three stages:
 
-```
-Developer pushes code
-       │
-       ├── Stage 1 (parallel — ~60 seconds):
-       │   ├── CodeQL: taint analysis for logic flaws
-       │   ├── Bandit: Python security lint
-       │   ├── Trivy: CVE scan on dependencies
-       │   └── Gitleaks: secret detection in git history
-       │
-       ├── Stage 2 (after Stage 1 — ~2 minutes):
-       │   └── OWASP ZAP: attacks the running app via Docker
-       │
-       └── Stage 3 (always runs):
-           └── Consolidated HTML report + email notification
-```
+**Stage 1 — Code Security (~60 seconds, all run in parallel)**
 
-Stage 1 jobs run in parallel — four fresh Ubuntu VMs spin up simultaneously, each running a different scanner. This keeps the pipeline fast.
+Four scanners launch simultaneously on four separate machines: CodeQL performs taint analysis for logic flaws, Bandit runs Python-specific security checks, Trivy scans dependencies for known CVEs, and Gitleaks searches the entire git history for leaked secrets. Running them in parallel keeps the total time under a minute.
 
-Stage 2 (DAST) depends on Stage 1 because there's no point attacking the app if leaked credentials have already been found.
+**Stage 2 — Runtime Attack (~2 minutes, runs after Stage 1)**
 
-Stage 3 always runs, even if previous stages fail. It downloads all scan results, merges them into a single styled HTML dashboard, and uploads it as a downloadable artifact.
+OWASP ZAP spins up the application inside a Docker container and attacks it with real exploit payloads. This only starts after Stage 1 completes — there's no point attacking the app if leaked credentials have already been found.
+
+**Stage 3 — Reporting (always runs, even if scanners fail)**
+
+A Python script downloads all scan results, merges them into a single styled HTML dashboard, and uploads it as a downloadable artifact. An email notification is also sent. This stage runs even if previous stages fail — so developers always know what went wrong.
 
 ---
 

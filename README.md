@@ -10,9 +10,8 @@
 
 ## The Scenario
 
-**Skyline Financial Tech**, a rapidly scaling neobank, is moving to hourly deployments. After a leaked AWS key and a production SQL injection incident, the board has issued an ultimatum: **automate the defense in 30 days, or shut down deployment.**
-
-Guardrail CI is the answer — an invisible, intelligent security shield built entirely on GitHub.
+Imagine a fintech startup deploying code 50 times a day. One night, a developer accidentally pushes an AWS secret key to a public repo. A week later, a SQL injection flaw is found in the production API. The board says: automate security, or shut down deployment.                                                                                                                    
+Guardrail CI is the answer — an automated security pipeline that scans every commit across four layers of defense and blocks anything that fails.
 
 ## Architecture
 
@@ -53,7 +52,7 @@ graph TD
 | Secrets | Gitleaks (`gitleaks/gitleaks-action@v2`) |
 | Reporting | Custom Python aggregator + SMTP email |
 
-## Sample App — Skyline Banking API
+## Sample App — Mock Banking API
 
 A FastAPI mock banking API with **intentionally planted vulnerabilities** for the scanners to detect:
 

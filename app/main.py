@@ -8,8 +8,8 @@ from app.admin import router as admin_router
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
-    title="Skyline Banking API",
-    description="Mock banking API for Operation Aegis DevSecOps demonstration",
+    title="Guardrail CI — Mock Banking API",
+    description="A deliberately vulnerable banking API for DevSecOps pipeline demonstration",
     version="1.0.0",
 )
 
